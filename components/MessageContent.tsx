@@ -567,12 +567,46 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
   const [beautifiedCodes, setBeautifiedCodes] = useState<Record<string, string>>({});
 
   const copyToClipboard = useCallback((code: string, id: string) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopiedCode(id);
-      setTimeout(() => setCopiedCode(null), 2000);
-    }).catch((error) => {
-      console.error('Failed to copy:', error);
-    });
+    // Fallback for clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => {
+        setCopiedCode(id);
+        setTimeout(() => setCopiedCode(null), 2000);
+      }).catch((error) => {
+        console.error('Failed to copy:', error);
+        // Fallback method
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          setCopiedCode(id);
+          setTimeout(() => setCopiedCode(null), 2000);
+        } catch (err) {
+          console.error('Fallback copy failed:', err);
+        }
+        document.body.removeChild(textArea);
+      });
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedCode(id);
+        setTimeout(() => setCopiedCode(null), 2000);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
   }, []);
 
   const executeCode = useCallback(async (code: string, language: string, codeId: string) => {
@@ -684,7 +718,9 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
               const inline = props.inline ?? false;
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
-              const code = String(children).replace(/\n$/, '');
+              // Ensure code is properly extracted and doesn't get cut off
+              const rawCode = String(children);
+              const code = rawCode.endsWith('\n') ? rawCode.slice(0, -1) : rawCode;
               const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
 
               if (!inline && match) {
@@ -806,7 +842,11 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                           showLineNumbers={true}
                           wrapLines={false}
                           wrapLongLines={true}
-                          lineNumberStyle={{ minWidth: '2.5em' }}
+                          lineNumberStyle={{
+                            minWidth: '2.5em',
+                            paddingRight: '1em',
+                            userSelect: 'none'
+                          }}
                           customStyle={{
                             margin: 0,
                             borderTopLeftRadius: 0,
@@ -816,9 +856,18 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                             padding: '1rem',
                             overflowX: 'auto',
                             maxWidth: '100%',
+                            minHeight: '3rem',
+                            maxHeight: '600px',
+                          }}
+                          codeTagProps={{
+                            style: {
+                              fontSize: 'inherit',
+                              lineHeight: 'inherit',
+                              display: 'block'
+                            }
                           }}
                         >
-                          {displayCode}
+                          {displayCode || ' '}
                         </SyntaxHighlighter>
                       </Suspense>
                     </div>
@@ -830,8 +879,12 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                 );
               }
 
+              // Inline code
               return (
-                <code className={className} {...props}>
+                <code
+                  className={`${className || ''} px-1 py-0.5 rounded bg-white/10 dark:bg-black/20 text-sm`}
+                  {...props}
+                >
                   {children}
                 </code>
               );

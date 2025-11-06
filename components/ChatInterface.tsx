@@ -175,7 +175,7 @@ export default function ChatInterface({
         retryable: true
       });
     }
-  }, [uploadedFile, messages]);
+  }, [uploadedFile, messages, sessionId]);
 
   const sendToAPI = useCallback(async (currentMessages: Message[], retry = 0): Promise<void> => {
     setIsLoading(true);
@@ -226,13 +226,22 @@ export default function ChatInterface({
 
         setMessages((prev) => [...prev, assistantMessage]);
       } else {
-        // Handle text generation
-        const apiMessages = currentMessages.map((msg) => {
+        // Handle text generation with proper context management
+        // Include last 10 messages for context to avoid token limit issues
+        const contextWindow = 10;
+        const messagesToSend = currentMessages.slice(-contextWindow);
+        
+        const apiMessages = messagesToSend.map((msg) => {
           let messageContent = msg.content;
           
           // Include file content in the message if present
           if (msg.fileData) {
-            messageContent = `File: ${msg.fileData.name}\nContent:\n${msg.fileData.content}\n\nUser question: ${msg.content}`;
+            // Truncate file content if too long to avoid token limits
+            const maxFileLength = 2000;
+            const truncatedContent = msg.fileData.content.length > maxFileLength
+              ? msg.fileData.content.substring(0, maxFileLength) + '...[truncated]'
+              : msg.fileData.content;
+            messageContent = `File: ${msg.fileData.name}\nContent:\n${truncatedContent}\n\nUser question: ${msg.content}`;
           }
           
           return {
@@ -328,7 +337,7 @@ export default function ChatInterface({
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [isImageModel, selectedModel, retryCount]);
+  }, [isImageModel, selectedModel, retryCount, sessionId, onPreviewUpdate]);
 
   const handleFileUpload = useCallback((file: File | null) => {
     setUploadedFile(file);
@@ -413,16 +422,11 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border-b border-border/40 bg-muted/30 shrink-0 gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-sm font-semibold tracking-tight">Chat</h2>
-          {sessionId && (
-            <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded hidden sm:inline">
-              {sessionId.substring(0, 8)}...
-            </code>
-          )}
+      <div className="flex items-center justify-between px-4 py-3 bg-background shrink-0">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-semibold">Chat</h2>
           {retryCount > 0 && (
-            <span className="text-xs text-yellow-500">
+            <span className="text-xs text-muted-foreground">
               Retry {retryCount}/{MAX_RETRIES}
             </span>
           )}
@@ -463,15 +467,15 @@ export default function ChatInterface({
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-950 border-b border-red-200 dark:border-red-800">
+        <div className="p-3 bg-destructive/10 text-destructive">
           <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+              <p className="text-sm font-medium">
                 {error.message}
               </p>
               {error.details && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                <p className="text-xs opacity-70 mt-1">
                   {error.details}
                 </p>
               )}
@@ -480,15 +484,18 @@ export default function ChatInterface({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 bg-background">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center space-y-2">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-3 p-6 bg-card rounded-lg">
               <p className="text-lg font-medium">Welcome to AI Chat</p>
-              <p className="text-sm">Start a conversation or upload a file to analyze</p>
-              <p className="text-xs">
-                Model: {selectedModel?.split('/').pop() || 'Default'}
-              </p>
+              <p className="text-sm text-muted-foreground">Start a conversation or upload a file to analyze</p>
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <p>Model: {selectedModel?.split('/').pop() || 'Default'}</p>
+                {sessionId && (
+                  <p>Session: <code className="font-mono bg-muted px-1">{sessionId.substring(0, 8)}</code></p>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -497,15 +504,17 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-border/40 p-4 bg-muted/30 shrink-0">
-        <FileUpload 
-          onFileUpload={handleFileUpload} 
-          uploadedFile={uploadedFile} 
-        />
-        <MessageInput 
-          onSendMessage={handleSendMessage} 
-          isLoading={isLoading} 
-        />
+      <div className="bg-background shrink-0">
+        <div className="p-4 space-y-3">
+          <FileUpload
+            onFileUpload={handleFileUpload}
+            uploadedFile={uploadedFile}
+          />
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
     </div>
   );

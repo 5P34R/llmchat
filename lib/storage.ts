@@ -15,12 +15,22 @@ const MAX_MESSAGE_LENGTH = 5000; // Truncate very long messages
 
 // Compress message content to reduce storage size
 function compressMessage(message: Message): Message {
+  // Ensure message has required fields
+  if (!message || typeof message !== 'object') {
+    return {
+      id: Date.now().toString(),
+      role: 'system',
+      content: 'Invalid message',
+      timestamp: Date.now()
+    };
+  }
+  
   return {
     ...message,
-    content: message.content.slice(0, MAX_MESSAGE_LENGTH),
+    content: message.content ? message.content.slice(0, MAX_MESSAGE_LENGTH) : '',
     fileData: message.fileData ? {
       ...message.fileData,
-      content: message.fileData.content.slice(0, MAX_MESSAGE_LENGTH)
+      content: message.fileData.content ? message.fileData.content.slice(0, MAX_MESSAGE_LENGTH) : ''
     } : undefined
   };
 }
@@ -33,10 +43,32 @@ export function getStoredConversations(): ChatSession[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
     
-    const conversations: ChatSession[] = JSON.parse(stored);
-    return conversations;
+    const parsed = JSON.parse(stored);
+    
+    // Validate and fix conversation data
+    const conversations: ChatSession[] = Array.isArray(parsed) ? parsed : [];
+    
+    // Ensure each conversation has required fields
+    return conversations.map(conv => ({
+      id: conv.id || Date.now().toString(),
+      shortId: conv.shortId || 'unknown',
+      title: conv.title || 'Untitled',
+      timestamp: conv.timestamp || Date.now(),
+      messages: Array.isArray(conv.messages) ? conv.messages : [],
+      metadata: conv.metadata || {
+        createdAt: conv.timestamp || Date.now(),
+        lastActiveAt: Date.now(),
+        messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
+      }
+    }));
   } catch (error) {
     console.error('Error loading conversations:', error);
+    // Try to recover by clearing corrupted data
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (clearError) {
+      console.error('Failed to clear corrupted data:', clearError);
+    }
     return [];
   }
 }
@@ -45,21 +77,51 @@ export function getStoredConversations(): ChatSession[] {
 export function saveConversations(conversations: ChatSession[]): void {
   if (typeof window === 'undefined') return;
   
+  // Validate input
+  if (!Array.isArray(conversations)) {
+    console.error('Invalid conversations data');
+    return;
+  }
+  
   try {
+    // Filter out invalid conversations
+    const validConversations = conversations.filter(conv =>
+      conv && typeof conv === 'object' && conv.id
+    );
+    
     // Limit number of conversations
-    const limitedConversations = conversations
-      .sort((a, b) => b.timestamp - a.timestamp)
+    const limitedConversations = validConversations
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
       .slice(0, MAX_CONVERSATIONS);
     
     // Compress messages in each conversation
     const optimizedConversations = limitedConversations.map(conv => ({
       ...conv,
-      messages: conv.messages
-        .slice(-MAX_MESSAGES_PER_CONVERSATION) // Keep only recent messages
-        .map(compressMessage)
+      messages: Array.isArray(conv.messages)
+        ? conv.messages
+            .slice(-MAX_MESSAGES_PER_CONVERSATION) // Keep only recent messages
+            .map(compressMessage)
+        : []
     }));
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(optimizedConversations));
+    const dataToStore = JSON.stringify(optimizedConversations);
+    
+    // Check size before saving
+    const sizeInBytes = new Blob([dataToStore]).size;
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
+    if (sizeInBytes > maxSize) {
+      // Further reduce data if too large
+      const minimalConversations = optimizedConversations
+        .slice(0, 10)
+        .map(conv => ({
+          ...conv,
+          messages: conv.messages.slice(-20)
+        }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalConversations));
+    } else {
+      localStorage.setItem(STORAGE_KEY, dataToStore);
+    }
   } catch (error) {
     console.error('Error saving conversations:', error);
     
@@ -67,16 +129,25 @@ export function saveConversations(conversations: ChatSession[]): void {
     if (error instanceof Error && error.name === 'QuotaExceededError') {
       try {
         const reducedConversations = conversations
-          .sort((a, b) => b.timestamp - a.timestamp)
-          .slice(0, 20) // Reduce to 20 conversations
+          .filter(conv => conv && conv.id)
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+          .slice(0, 10) // Reduce to 10 conversations
           .map(conv => ({
             ...conv,
-            messages: conv.messages.slice(-50).map(compressMessage) // Keep only 50 messages
+            messages: Array.isArray(conv.messages)
+              ? conv.messages.slice(-20).map(compressMessage) // Keep only 20 messages
+              : []
           }));
         
         localStorage.setItem(STORAGE_KEY, JSON.stringify(reducedConversations));
       } catch (retryError) {
         console.error('Failed to save even with reduced data:', retryError);
+        // As last resort, clear old data
+        try {
+          clearOldConversations(5);
+        } catch (clearError) {
+          console.error('Failed to clear old conversations:', clearError);
+        }
       }
     }
   }
@@ -116,11 +187,18 @@ export function clearOldConversations(keepCount: number = 20): void {
 
 // Delete a specific conversation
 export function deleteConversation(conversationId: string): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !conversationId) return;
   
   try {
     const conversations = getStoredConversations();
-    const filtered = conversations.filter(conv => conv.id !== conversationId);
+    const filtered = conversations.filter(conv => conv && conv.id !== conversationId);
+    
+    // Ensure at least one conversation remains
+    if (filtered.length === 0) {
+      console.warn('Cannot delete last conversation');
+      return;
+    }
+    
     saveConversations(filtered);
   } catch (error) {
     console.error('Error deleting conversation:', error);

@@ -146,14 +146,14 @@ export default function FileUpload({ onFileUpload, uploadedFile }: FileUploadPro
   return (
     <div className="mb-2 space-y-2">
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-500 dark:text-red-400 px-1">
+        <div className="flex items-center gap-2 text-sm text-destructive px-1">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       
       {uploadedFile ? (
-        <Card className="flex items-center gap-2 p-3 bg-muted border-border/40">
+        <div className="flex items-center gap-2 p-3 bg-muted">
           {getFileIcon(uploadedFile.name)}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate" title={uploadedFile.name}>
@@ -173,7 +173,7 @@ export default function FileUpload({ onFileUpload, uploadedFile }: FileUploadPro
           >
             <X className="h-4 w-4" />
           </Button>
-        </Card>
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           <input
@@ -188,7 +188,7 @@ export default function FileUpload({ onFileUpload, uploadedFile }: FileUploadPro
             aria-describedby="file-upload-help"
           />
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             asChild
             className="h-9"

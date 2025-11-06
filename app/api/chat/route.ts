@@ -67,30 +67,10 @@ export async function POST(request: NextRequest) {
 
     let messages = body.messages;
 
-    // If session ID is provided, include previous context (last 10 messages for context window)
-    if (sessionId && typeof window !== 'undefined') {
-      try {
-        const sessionMessages = getSessionMessages(sessionId);
-        if (sessionMessages.length > 0) {
-          // Get last 10 messages for context, but always include the current message
-          const contextMessages = sessionMessages
-            .slice(-10)
-            .filter(msg => !messages.some(m => m.content === msg.content))
-            .map(msg => ({
-              role: msg.role,
-              content: msg.content
-            }));
-          
-          // Prepend context messages if they exist
-          if (contextMessages.length > 0) {
-            console.log(`Including ${contextMessages.length} context messages from session ${sessionId}`);
-            messages = [...contextMessages, ...messages];
-          }
-        }
-      } catch (error) {
-        console.error('Error loading session context:', error);
-        // Continue without session context if there's an error
-      }
+    // Note: Session context should be handled on the client side since this is a server-side API route
+    // The client should send all relevant messages in the request
+    if (sessionId) {
+      console.log(`Processing request for session: ${sessionId}`);
     }
 
     // Apply chain of thought prompting for all models (can be toggled)

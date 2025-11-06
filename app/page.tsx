@@ -32,30 +32,47 @@ export default function Home() {
 
   // Load conversations from localStorage on mount
   useEffect(() => {
-    const stored = getStoredConversations();
-    if (stored.length > 0) {
-      // Convert old format to new format if needed
-      const convertedConversations = stored.map((conv: any) => {
-        if (!('shortId' in conv)) {
-          const metadata = createSessionMetadata();
-          return {
-            id: conv.id || metadata.id,
-            shortId: metadata.shortId,
-            title: conv.title || 'New Conversation',
-            timestamp: conv.timestamp || Date.now(),
-            messages: conv.messages || [],
-            metadata: {
-              createdAt: conv.timestamp || Date.now(),
-              lastActiveAt: conv.timestamp || Date.now(),
-              messageCount: conv.messages?.length || 0
-            }
-          } as ChatSession;
-        }
-        return conv as ChatSession;
-      });
-      setConversations(convertedConversations);
-      setCurrentConversationId(convertedConversations[0].id);
-    } else {
+    try {
+      const stored = getStoredConversations();
+      if (stored && stored.length > 0) {
+        // Convert old format to new format if needed
+        const convertedConversations = stored.map((conv: any) => {
+          if (!conv || typeof conv !== 'object') {
+            const metadata = createSessionMetadata();
+            return {
+              id: metadata.id,
+              shortId: metadata.shortId,
+              title: 'Recovered Conversation',
+              timestamp: Date.now(),
+              messages: [],
+              metadata: {
+                createdAt: Date.now(),
+                lastActiveAt: Date.now(),
+                messageCount: 0
+              }
+            } as ChatSession;
+          }
+          
+          if (!('shortId' in conv)) {
+            const metadata = createSessionMetadata();
+            return {
+              id: conv.id || metadata.id,
+              shortId: metadata.shortId,
+              title: conv.title || 'New Conversation',
+              timestamp: conv.timestamp || Date.now(),
+              messages: Array.isArray(conv.messages) ? conv.messages : [],
+              metadata: {
+                createdAt: conv.timestamp || Date.now(),
+                lastActiveAt: conv.timestamp || Date.now(),
+                messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
+              }
+            } as ChatSession;
+          }
+          return conv as ChatSession;
+        });
+        setConversations(convertedConversations);
+        setCurrentConversationId(convertedConversations[0].id);
+      } else {
       // Create initial conversation if none exists
       const sessionMeta = createSessionMetadata();
       const initialConversation: ChatSession = {
@@ -72,14 +89,38 @@ export default function Home() {
       };
       setConversations([initialConversation]);
       setCurrentConversationId(initialConversation.id);
+      }
+      setIsLoaded(true);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      // Create a fresh conversation on error
+      const sessionMeta = createSessionMetadata();
+      const initialConversation: ChatSession = {
+        id: sessionMeta.id,
+        shortId: sessionMeta.shortId,
+        title: 'New Conversation',
+        timestamp: Date.now(),
+        messages: [],
+        metadata: {
+          createdAt: sessionMeta.createdAt,
+          lastActiveAt: sessionMeta.lastActiveAt,
+          messageCount: 0
+        }
+      };
+      setConversations([initialConversation]);
+      setCurrentConversationId(initialConversation.id);
+      setIsLoaded(true);
     }
-    setIsLoaded(true);
   }, []);
 
   // Save conversations to localStorage whenever they change
   useEffect(() => {
     if (isLoaded && conversations.length > 0) {
-      saveConversations(conversations);
+      try {
+        saveConversations(conversations);
+      } catch (error) {
+        console.error('Error saving conversations:', error);
+      }
     }
   }, [conversations, isLoaded]);
 
@@ -143,8 +184,8 @@ export default function Home() {
     setIsMobileSidebarOpen(false); // Close sidebar on mobile after deletion
   };
 
-  const handleMessagesUpdate = (messages: Message[]) => {
-    if (!currentConversationId) return;
+  const handleMessagesUpdate = useCallback((messages: Message[]) => {
+    if (!currentConversationId || !Array.isArray(messages)) return;
 
     setConversations(prev => {
       return prev.map(conv => {
@@ -158,9 +199,9 @@ export default function Home() {
           
           // Update title based on first user message
           const firstUserMessage = messages.find(m => m.role === 'user');
-          const title = firstUserMessage
+          const title = firstUserMessage && firstUserMessage.content
             ? firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
-            : 'New Conversation';
+            : conv.title || 'New Conversation';
           
           // Add session ID to messages
           const messagesWithSession = messages.map(msg => ({
@@ -183,10 +224,12 @@ export default function Home() {
         return conv;
       });
     });
-  };
+  }, [currentConversationId]);
 
   // Handle preview content updates from ChatInterface
   const handlePreviewUpdate = useCallback((content: { html?: string; css?: string; js?: string }) => {
+    if (!content || typeof content !== 'object') return;
+    
     setPreviewContent(prev => ({
       html: content.html !== undefined ? content.html : prev.html,
       css: content.css !== undefined ? content.css : prev.css,
@@ -209,20 +252,36 @@ export default function Home() {
 
   return (
     <main className="flex h-screen w-screen bg-background overflow-hidden relative">
-      {/* Mobile Menu Button */}
-      <Button
-        onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-        variant="ghost"
-        size="icon"
-        className="lg:hidden fixed top-4 left-4 z-50"
-      >
-        {isMobileSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </Button>
+      {/* Mobile Header Bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between h-full px-4">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+            >
+              {isMobileSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+            <h1 className="text-sm font-semibold">LLM Chat</h1>
+          </div>
+          {currentConversation && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Session:</span>
+              <code className="text-xs font-mono bg-muted px-2 py-0.5">
+                {currentConversation.shortId}
+              </code>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Sidebar with mobile overlay */}
       <div className={`
         ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 fixed lg:relative z-40 h-full transition-transform duration-300 ease-in-out
+        ${isMobileSidebarOpen ? 'pt-14 lg:pt-0' : ''}
       `}>
         <Sidebar
           conversations={conversations}
@@ -243,23 +302,13 @@ export default function Home() {
         />
       )}
       
-      <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden pt-14 lg:pt-0">
         {/* Chat Interface */}
         <div className={`
           ${showPreview ? 'lg:w-1/2' : 'w-full'}
           ${showPreview ? 'h-1/2 lg:h-full' : 'h-full'}
           flex flex-col transition-all duration-300
         `}>
-          {/* Session Info Bar for Mobile */}
-          <div className="lg:hidden bg-muted/30 border-b border-border/40 px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 ml-12">
-              <span className="text-xs text-muted-foreground">Session:</span>
-              <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
-                {currentConversation?.shortId || 'none'}
-              </code>
-            </div>
-          </div>
-          
           <ChatInterface
             key={currentConversationId}
             initialMessages={currentConversation?.messages || []}
@@ -295,7 +344,7 @@ export default function Home() {
       {!showPreview && (
         <Button
           onClick={() => setShowPreview(true)}
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="fixed bottom-4 right-4 z-20 shadow-lg"
         >

@@ -68,7 +68,7 @@ export default function Sidebar({
 
   if (isCollapsed) {
     return (
-      <div className="w-16 border-r border-border/40 bg-muted/30 flex flex-col items-center py-4 gap-4">
+      <div className="w-16 bg-background flex flex-col items-center py-4 gap-4">
         <Button
           variant="ghost"
           size="icon"
@@ -92,8 +92,8 @@ export default function Sidebar({
   }
 
   return (
-    <div className="w-64 lg:w-72 border-r border-border/40 bg-muted/30 flex flex-col h-full">
-      <div className="p-3 sm:p-4 border-b border-border/40 flex items-center justify-between">
+    <div className="w-64 lg:w-72 bg-background border-r flex flex-col h-full">
+      <div className="p-3 sm:p-4 flex items-center justify-between">
         <h2 className="font-semibold tracking-tight text-sm sm:text-base">LLM Chat</h2>
         <div className="flex items-center gap-1">
           <ThemeToggle />
@@ -109,7 +109,11 @@ export default function Sidebar({
       </div>
 
       <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
-        <Button onClick={onNewChat} className="w-full justify-start text-xs sm:text-sm" size="sm">
+        <Button
+          onClick={onNewChat}
+          className="w-full justify-start text-xs sm:text-sm"
+          size="sm"
+        >
           <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
           New Chat
         </Button>
@@ -120,7 +124,7 @@ export default function Sidebar({
             Model Selection
           </label>
           <Select value={selectedModel} onValueChange={onModelChange}>
-            <SelectTrigger className="w-full text-xs sm:text-sm">
+            <SelectTrigger className="w-full text-xs sm:text-sm border-0 bg-background">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
@@ -143,16 +147,20 @@ export default function Sidebar({
             <p className="text-xs text-muted-foreground px-2">No conversations yet</p>
           ) : (
             conversations.map((conv) => (
-              <Card
+              <div
                 key={conv.id}
-                className={`group relative p-2 sm:p-3 cursor-pointer hover:bg-accent transition-colors ${
-                  currentConversationId === conv.id ? 'bg-accent' : ''
-                }`}
+                className={`group relative p-2 sm:p-3 cursor-pointer transition-all duration-200
+                  ${
+                    currentConversationId === conv.id
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50'
+                  }
+                `}
               >
                 {deleteConfirmId === conv.id ? (
                   // Delete confirmation view
                   <div className="flex flex-col gap-2 p-1">
-                    <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                    <p className="text-xs font-medium">
                       Delete this conversation?
                     </p>
                     <div className="flex gap-2">
@@ -172,7 +180,7 @@ export default function Sidebar({
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         className="flex-1 h-7 text-xs"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -189,7 +197,9 @@ export default function Sidebar({
                     className="flex items-start gap-2"
                     onClick={() => onSelectConversation(conv.id)}
                   >
-                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <MessageSquare className={`h-3 w-3 sm:h-4 sm:w-4 mt-0.5 shrink-0 ${
+                      currentConversationId === conv.id ? '' : 'opacity-60'
+                    }`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
                         <p className="text-xs sm:text-sm font-medium truncate flex-1">
@@ -205,32 +215,40 @@ export default function Sidebar({
                               setDeleteConfirmId(conv.id);
                             }}
                           >
-                            <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex items-center gap-1">
-                          <Hash className="h-2 w-2 text-muted-foreground" />
-                          <code className="text-[10px] font-mono text-muted-foreground">
+                          <Hash className={`h-2 w-2 ${
+                            currentConversationId === conv.id ? '' : 'opacity-40'
+                          }`} />
+                          <code className={`text-[10px] font-mono ${
+                            currentConversationId === conv.id ? '' : 'opacity-50'
+                          }`}>
                             {conv.shortId}
                           </code>
                         </div>
                         {mounted && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className={`text-[10px] ${
+                            currentConversationId === conv.id ? '' : 'opacity-50'
+                          }`}>
                             {new Date(conv.timestamp).toLocaleDateString()}
                           </span>
                         )}
                       </div>
                       {conv.metadata && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                        <p className={`text-[10px] mt-0.5 ${
+                          currentConversationId === conv.id ? '' : 'opacity-50'
+                        }`}>
                           {conv.metadata.messageCount} messages
                         </p>
                       )}
                     </div>
                   </div>
                 )}
-              </Card>
+              </div>
             ))
           )}
         </div>
