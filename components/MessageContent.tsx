@@ -664,7 +664,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
 
   if (role === 'user') {
     return (
-      <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
+      <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere max-w-full">
         {imageUrl && (
           <div className="mb-2">
             <Card className="p-2 inline-block">
@@ -673,11 +673,15 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                 alt="Generated"
                 className="max-w-full h-auto rounded"
                 style={{ maxHeight: '300px' }}
+                loading="lazy"
               />
             </Card>
           </div>
         )}
-        {content}
+        {/* Ensure long content doesn't break layout */}
+        <div className="overflow-x-auto">
+          {content || ''}
+        </div>
       </div>
     );
   }
@@ -693,7 +697,23 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
         </Card>
       }
     >
-      <div className="prose prose-sm max-w-none dark:prose-invert prose-neutral overflow-x-hidden">
+      {/* Enhanced prose styling for better markdown rendering */}
+      <div className="prose prose-sm max-w-none dark:prose-invert
+                      prose-headings:font-bold prose-headings:tracking-tight
+                      prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base
+                      prose-p:leading-relaxed prose-p:text-gray-700 dark:prose-p:text-gray-300
+                      prose-li:text-gray-700 dark:prose-li:text-gray-300
+                      prose-strong:text-gray-900 dark:prose-strong:text-gray-100
+                      prose-code:text-pink-600 dark:prose-code:text-pink-400
+                      prose-code:bg-gray-100 dark:prose-code:bg-gray-800
+                      prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                      prose-pre:bg-gray-900 dark:prose-pre:bg-gray-950
+                      prose-blockquote:border-l-gray-300 dark:prose-blockquote:border-l-gray-600
+                      prose-blockquote:text-gray-700 dark:prose-blockquote:text-gray-300
+                      prose-table:overflow-hidden
+                      prose-th:bg-gray-100 dark:prose-th:bg-gray-800
+                      prose-td:p-2 prose-th:p-2
+                      overflow-x-auto">
         {imageUrl && (
           <div className="mb-4 not-prose">
             <Card className="p-4">
@@ -714,12 +734,122 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            // Enhanced table rendering
+            table: ({ children }) => (
+              <div className="overflow-x-auto my-4">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  {children}
+                </table>
+              </div>
+            ),
+            thead: ({ children }) => (
+              <thead className="bg-gray-50 dark:bg-gray-800">{children}</thead>
+            ),
+            tbody: ({ children }) => (
+              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-700">
+                {children}
+              </tbody>
+            ),
+            tr: ({ children }) => (
+              <tr className="hover:bg-gray-50 dark:hover:bg-gray-800">{children}</tr>
+            ),
+            th: ({ children }) => (
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                {children}
+              </th>
+            ),
+            td: ({ children }) => (
+              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                {children}
+              </td>
+            ),
+            // Enhanced list rendering
+            ul: ({ children }) => (
+              <ul className="list-disc list-inside space-y-1 my-2 ml-4">{children}</ul>
+            ),
+            ol: ({ children }) => (
+              <ol className="list-decimal list-inside space-y-1 my-2 ml-4">{children}</ol>
+            ),
+            li: ({ children }) => (
+              <li className="text-sm leading-relaxed">{children}</li>
+            ),
+            // Enhanced heading rendering
+            h1: ({ children }) => (
+              <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900 dark:text-gray-100">{children}</h1>
+            ),
+            h2: ({ children }) => (
+              <h2 className="text-xl font-semibold mt-5 mb-3 text-gray-900 dark:text-gray-100">{children}</h2>
+            ),
+            h3: ({ children }) => (
+              <h3 className="text-lg font-semibold mt-4 mb-2 text-gray-900 dark:text-gray-100">{children}</h3>
+            ),
+            h4: ({ children }) => (
+              <h4 className="text-base font-semibold mt-3 mb-2 text-gray-900 dark:text-gray-100">{children}</h4>
+            ),
+            // Enhanced paragraph rendering
+            p: ({ children }) => (
+              <p className="my-2 leading-relaxed text-sm">{children}</p>
+            ),
+            // Enhanced blockquote rendering
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 my-4 italic text-gray-700 dark:text-gray-300">
+                {children}
+              </blockquote>
+            ),
+            // Enhanced horizontal rule
+            hr: () => (
+              <hr className="my-4 border-gray-200 dark:border-gray-700" />
+            ),
+            // Enhanced link rendering
+            a: ({ href, children }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {children}
+              </a>
+            ),
+            // Enhanced emphasis rendering
+            strong: ({ children }) => (
+              <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+            ),
+            em: ({ children }) => (
+              <em className="italic">{children}</em>
+            ),
+            // Task list support
+            input: ({ type, checked, disabled }) => {
+              if (type === 'checkbox') {
+                return (
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    className="mr-2"
+                    readOnly
+                  />
+                );
+              }
+              return null;
+            },
             code({ node, className, children, ...props }: any) {
               const inline = props.inline ?? false;
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
+              
               // Ensure code is properly extracted and doesn't get cut off
-              const rawCode = String(children);
+              // Handle array of children (common with long code blocks)
+              let rawCode = '';
+              if (Array.isArray(children)) {
+                rawCode = children.map(child =>
+                  typeof child === 'string' ? child : String(child)
+                ).join('');
+              } else {
+                rawCode = String(children || '');
+              }
+              
+              // Remove trailing newline if present
               const code = rawCode.endsWith('\n') ? rawCode.slice(0, -1) : rawCode;
               const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -857,7 +987,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                             overflowX: 'auto',
                             maxWidth: '100%',
                             minHeight: '3rem',
-                            maxHeight: '600px',
+                            maxHeight: '800px', // Increased for longer code blocks
                           }}
                           codeTagProps={{
                             style: {
@@ -889,9 +1019,26 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                 </code>
               );
             },
+            // Enhanced pre/code block rendering for better formatting
+            pre: ({ children }) => {
+              // Check if this is a code block or just preformatted text
+              const isCodeBlock = React.isValidElement(children) &&
+                                 children.props?.className?.includes('language-');
+              
+              if (!isCodeBlock) {
+                return (
+                  <pre className="whitespace-pre-wrap break-words bg-gray-100 dark:bg-gray-800 p-3 rounded-md my-2 text-sm overflow-x-auto">
+                    {children}
+                  </pre>
+                );
+              }
+              
+              return <>{children}</>;
+            },
           }}
         >
-          {content}
+          {/* Ensure content is properly rendered even if very long */}
+          {content || ''}
         </ReactMarkdown>
 
         {previewCode && (

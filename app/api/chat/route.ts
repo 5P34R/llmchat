@@ -6,7 +6,9 @@ import { getSessionMessages } from '@/lib/storage';
 // Retry configuration for stability
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
-const TIMEOUT = 30000; // 30 seconds
+const TIMEOUT = 60000; // 60 seconds for longer responses
+const DEFAULT_MAX_TOKENS = 20000; // Maximum token limit as requested
+const MAX_CONTEXT_MESSAGES = 30; // Increased context window for better history
 
 async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -17,12 +19,14 @@ async function makeRequestWithRetry(
   messages: any[],
   temperature: number,
   maxTokens: number,
+  stream: boolean = false,
   retries = MAX_RETRIES
 ): Promise<any> {
   try {
-    // Create a timeout promise
+    // Create a timeout promise with longer timeout for streaming
+    const timeoutMs = stream ? TIMEOUT * 2 : TIMEOUT;
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), TIMEOUT);
+      setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
     });
 
     // Race between the API call and timeout
@@ -32,6 +36,7 @@ async function makeRequestWithRetry(
         messages,
         temperature,
         max_tokens: maxTokens,
+        stream: stream,
       }),
       timeoutPromise
     ]);
@@ -42,7 +47,7 @@ async function makeRequestWithRetry(
     if (retries > 0 && (error.status === 500 || error.status === 429 || error.message === 'Request timeout')) {
       console.log(`Retrying... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
       await delay(RETRY_DELAY * (MAX_RETRIES - retries + 1));
-      return makeRequestWithRetry(model, messages, temperature, maxTokens, retries - 1);
+      return makeRequestWithRetry(model, messages, temperature, maxTokens, stream, retries - 1);
     }
     throw error;
   }
@@ -62,6 +67,7 @@ export async function POST(request: NextRequest) {
     const modelToUse = body.model || DEFAULT_MODEL;
     const useThoughtChain = body.useThoughtChain !== false; // Default to true for all models
     const sessionId = body.sessionId;
+    const useStreaming = body.stream !== false; // Enable streaming by default
     
     console.log('Using model:', modelToUse, useThoughtChain ? '(with chain of thought)' : '', sessionId ? `Session: ${sessionId}` : '');
 
@@ -86,6 +92,7 @@ export async function POST(request: NextRequest) {
 3. Show your reasoning process clearly
 4. Verify your conclusions before presenting the final answer
 5. If uncertain, acknowledge limitations and provide the best possible response
+6. Provide complete and comprehensive answers without cutting off mid-response
 
 Use clear, structured thinking to provide accurate and well-reasoned responses.`
       };
@@ -98,16 +105,85 @@ Use clear, structured thinking to provide accurate and well-reasoned responses.`
       }
     }
 
-    // Make request with retry logic and timeout for stability
+    // Calculate appropriate max tokens based on model
+    const maxTokens = body.max_tokens || DEFAULT_MAX_TOKENS;
+    
+    // For streaming responses
+    if (useStreaming) {
+      try {
+        const stream = await makeRequestWithRetry(
+          modelToUse,
+          messages,
+          body.temperature || 0.7,
+          maxTokens,
+          true
+        );
+
+        // Create a ReadableStream to handle the streaming response
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            let fullContent = '';
+            try {
+              for await (const chunk of stream) {
+                const content = chunk.choices[0]?.delta?.content || '';
+                fullContent += content;
+                
+                // Send chunk as Server-Sent Event format
+                const data = JSON.stringify({
+                  content: content,
+                  isComplete: false
+                });
+                controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+              }
+              
+              // Send completion signal
+              const finalData = JSON.stringify({
+                content: '',
+                isComplete: true,
+                fullMessage: fullContent,
+                model: modelToUse,
+                sessionId: sessionId
+              });
+              controller.enqueue(encoder.encode(`data: ${finalData}\n\n`));
+              controller.close();
+            } catch (error) {
+              controller.error(error);
+            }
+          }
+        });
+
+        return new Response(readableStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      } catch (streamError) {
+        console.error('Streaming failed, falling back to regular response:', streamError);
+        // Fall back to non-streaming if streaming fails
+      }
+    }
+
+    // Non-streaming response (fallback or when streaming is disabled)
     const completion = await makeRequestWithRetry(
       modelToUse,
       messages,
       body.temperature || 0.7,
-      body.max_tokens || 2000
+      maxTokens,
+      false
     );
 
-    // Extract response
-    const responseContent = completion.choices[0].message.content;
+    // Extract response - check for completion reason
+    const choice = completion.choices[0];
+    const responseContent = choice.message.content;
+    const finishReason = choice.finish_reason;
+
+    // Warn if response was truncated
+    if (finishReason === 'length') {
+      console.warn('Response was truncated due to max_tokens limit');
+    }
 
     return NextResponse.json({
       message: responseContent,
@@ -115,6 +191,8 @@ Use clear, structured thinking to provide accurate and well-reasoned responses.`
       model: modelToUse,
       thoughtChain: useThoughtChain,
       sessionId: sessionId,
+      finishReason: finishReason,
+      truncated: finishReason === 'length'
     });
   } catch (error: any) {
     console.error('Chat API Error:', error);

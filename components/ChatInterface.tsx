@@ -227,8 +227,8 @@ export default function ChatInterface({
         setMessages((prev) => [...prev, assistantMessage]);
       } else {
         // Handle text generation with proper context management
-        // Include last 10 messages for context to avoid token limit issues
-        const contextWindow = 10;
+        // Use MAX_CONTEXT_MESSAGES from API for better history preservation
+        const contextWindow = 30; // Increased from 10 to match API
         const messagesToSend = currentMessages.slice(-contextWindow);
         
         const apiMessages = messagesToSend.map((msg) => {
@@ -236,8 +236,8 @@ export default function ChatInterface({
           
           // Include file content in the message if present
           if (msg.fileData) {
-            // Truncate file content if too long to avoid token limits
-            const maxFileLength = 2000;
+            // Increase file content limit for better context
+            const maxFileLength = 5000; // Increased from 2000
             const truncatedContent = msg.fileData.content.length > maxFileLength
               ? msg.fileData.content.substring(0, maxFileLength) + '...[truncated]'
               : msg.fileData.content;
@@ -250,43 +250,143 @@ export default function ChatInterface({
           };
         });
 
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: apiMessages,
-            model: selectedModel,
-            sessionId: sessionId || undefined,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (!data.message) {
-          throw new Error('No message received from API');
-        }
-
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.message,
-          timestamp: Date.now(),
-          sessionId: sessionId || undefined,
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
+        // Try streaming first, fall back to regular response
+        const useStreaming = true;
         
-        // Extract code from the assistant's message for preview
-        if (onPreviewUpdate && data.message) {
-          extractAndUpdatePreview(data.message);
+        if (useStreaming) {
+          try {
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                messages: apiMessages,
+                model: selectedModel,
+                sessionId: sessionId || undefined,
+                stream: true,
+                max_tokens: 20000, // Use the maximum token limit
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Handle streaming response
+            if (response.headers.get('content-type')?.includes('text/event-stream')) {
+              const reader = response.body?.getReader();
+              const decoder = new TextDecoder();
+              
+              let assistantMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: '',
+                timestamp: Date.now(),
+                sessionId: sessionId || undefined,
+              };
+              
+              // Add initial empty message
+              setMessages((prev) => [...prev, assistantMessage]);
+              
+              let fullContent = '';
+              
+              if (reader) {
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          const data = JSON.parse(line.slice(6));
+                          
+                          if (data.isComplete) {
+                            // Final message with full content
+                            fullContent = data.fullMessage || fullContent;
+                            assistantMessage.content = fullContent;
+                            
+                            // Update with final message
+                            setMessages((prev) => {
+                              const newMessages = [...prev];
+                              const lastIndex = newMessages.length - 1;
+                              if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
+                                newMessages[lastIndex] = { ...assistantMessage };
+                              }
+                              return newMessages;
+                            });
+                            
+                            // Extract code for preview
+                            if (onPreviewUpdate && fullContent) {
+                              extractAndUpdatePreview(fullContent);
+                            }
+                          } else if (data.content) {
+                            // Accumulate content
+                            fullContent += data.content;
+                            assistantMessage.content = fullContent;
+                            
+                            // Update message in real-time
+                            setMessages((prev) => {
+                              const newMessages = [...prev];
+                              const lastIndex = newMessages.length - 1;
+                              if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
+                                newMessages[lastIndex] = { ...assistantMessage, content: fullContent };
+                              }
+                              return newMessages;
+                            });
+                          }
+                        } catch (parseError) {
+                          console.error('Error parsing SSE data:', parseError);
+                        }
+                      }
+                    }
+                  }
+                } finally {
+                  reader.releaseLock();
+                }
+              }
+            } else {
+              // Fall back to regular JSON response
+              const data = await response.json();
+              
+              if (!data.message) {
+                throw new Error('No message received from API');
+              }
+              
+              // Check if response was truncated
+              if (data.truncated) {
+                console.warn('Response was truncated due to token limit');
+                data.message += '\n\n[Note: Response was truncated due to length limit]';
+              }
+              
+              const assistantMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: data.message,
+                timestamp: Date.now(),
+                sessionId: sessionId || undefined,
+              };
+              
+              setMessages((prev) => [...prev, assistantMessage]);
+              
+              // Extract code from the assistant's message for preview
+              if (onPreviewUpdate && data.message) {
+                extractAndUpdatePreview(data.message);
+              }
+            }
+          } catch (streamError) {
+            console.error('Streaming failed, falling back to regular request:', streamError);
+            // Fall back to non-streaming request
+            await sendNonStreamingRequest(apiMessages);
+          }
+        } else {
+          await sendNonStreamingRequest(apiMessages);
         }
       }
       
@@ -337,7 +437,7 @@ export default function ChatInterface({
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [isImageModel, selectedModel, retryCount, sessionId, onPreviewUpdate]);
+  }, [isImageModel, selectedModel, sessionId, onPreviewUpdate]);
 
   const handleFileUpload = useCallback((file: File | null) => {
     setUploadedFile(file);
@@ -408,6 +508,56 @@ export default function ChatInterface({
       onPreviewUpdate(updates);
     }
   }, [onPreviewUpdate]);
+
+  // Helper function for non-streaming requests
+  const sendNonStreamingRequest = useCallback(async (apiMessages: any[]) => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: apiMessages,
+        model: selectedModel,
+        sessionId: sessionId || undefined,
+        stream: false,
+        max_tokens: 20000, // Use the maximum token limit
+      }),
+      signal: abortControllerRef.current?.signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.message) {
+      throw new Error('No message received from API');
+    }
+
+    // Check if response was truncated
+    if (data.truncated) {
+      console.warn('Response was truncated due to token limit');
+      data.message += '\n\n[Note: Response was truncated due to length limit]';
+    }
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: data.message,
+      timestamp: Date.now(),
+      sessionId: sessionId || undefined,
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+    
+    // Extract code from the assistant's message for preview
+    if (onPreviewUpdate && data.message) {
+      extractAndUpdatePreview(data.message);
+    }
+  }, [selectedModel, sessionId, onPreviewUpdate, extractAndUpdatePreview]);
 
   // Watch for code in messages and update preview
   useEffect(() => {

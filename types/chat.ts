@@ -38,4 +38,5 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
   useThoughtChain?: boolean;
   sessionId?: string; // Add session context
+  stream?: boolean; // Add streaming support
 }
