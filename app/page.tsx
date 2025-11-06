@@ -19,8 +19,14 @@ interface PreviewContent {
 export default function Home() {
   const [conversations, setConversations] = useState<ChatSession[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  // Use a working model as default - Claude Haiku 4.5 is fast and reliable
-  const [selectedModel, setSelectedModel] = useState('provider-7/claude-haiku-4-5-20251001');
+  // Load saved model from localStorage or use default
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedModel = localStorage.getItem('selectedModel');
+      return savedModel || 'provider-7/claude-haiku-4-5-20251001';
+    }
+    return 'provider-7/claude-haiku-4-5-20251001';
+  });
   const [isLoaded, setIsLoaded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -123,6 +129,13 @@ export default function Home() {
       }
     }
   }, [conversations, isLoaded]);
+
+  // Save selected model to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && selectedModel) {
+      localStorage.setItem('selectedModel', selectedModel);
+    }
+  }, [selectedModel]);
 
   const currentConversation = conversations.find(c => c.id === currentConversationId);
 

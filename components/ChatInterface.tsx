@@ -49,19 +49,19 @@ export default function ChatInterface({
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Track if messages have been initialized
-  const [isInitialized, setIsInitialized] = useState(false);
-
+  // Initialize messages from props
   useEffect(() => {
-    if (!isInitialized && initialMessages.length > 0) {
+    // Always sync with initialMessages when they change
+    // This ensures messages persist across refreshes
+    if (initialMessages && initialMessages.length > 0) {
       setMessages(initialMessages);
-      setIsInitialized(true);
     }
-  }, [initialMessages, isInitialized]);
+  }, [initialMessages]);
 
   useEffect(() => {
-    // Only update if we have messages and they're different from initial
-    if (onMessagesUpdate && messages.length > 0 && isInitialized) {
+    // Update parent component whenever messages change
+    // This ensures messages are saved to localStorage
+    if (onMessagesUpdate && messages.length > 0) {
       // Debounce the update to prevent rapid calls
       const timeoutId = setTimeout(() => {
         try {
@@ -73,7 +73,7 @@ export default function ChatInterface({
 
       return () => clearTimeout(timeoutId);
     }
-  }, [messages, onMessagesUpdate, isInitialized]);
+  }, [messages, onMessagesUpdate]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -85,10 +85,19 @@ export default function ChatInterface({
   }, []);
 
   const isImageModel = useMemo(() => {
-    return selectedModel?.includes('flux') ||
-           selectedModel?.includes('imagen') ||
-           selectedModel?.includes('dall-e') ||
-           selectedModel?.includes('stable-diffusion');
+    // Check if the selected model is an image generation model
+    const imageModelKeywords = [
+      'flux',
+      'imagen',
+      'dall-e',
+      'stable-diffusion',
+      'midjourney',
+      'sdxl'
+    ];
+    
+    return imageModelKeywords.some(keyword =>
+      selectedModel?.toLowerCase().includes(keyword)
+    );
   }, [selectedModel]);
 
   const handleFileRead = useCallback((file: File): Promise<string> => {

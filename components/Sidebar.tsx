@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ThemeToggle } from './theme-toggle';
-import { MessageSquare, Plus, Settings, ChevronLeft, ChevronRight, Hash, Trash2, X } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MessageSquare, Plus, Settings, ChevronLeft, ChevronRight, Hash, Trash2, X, Sparkles, Image } from 'lucide-react';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { ChatSession } from '@/types/chat';
 
 interface SidebarProps {
@@ -24,29 +18,44 @@ interface SidebarProps {
   onModelChange: (model: string) => void;
 }
 
-const AVAILABLE_MODELS = [
-  // Working Text Models (Tested & Confirmed)
-  { value: 'provider-7/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 ⚡', type: 'text' },
-  { value: 'provider-7/claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', type: 'text' },
-  { value: 'provider-5/claude-3.7-sonnet-thinking', label: 'Claude 3.7 Sonnet 🧠', type: 'text' },
-  { value: 'provider-5/claude-opus-4.1', label: 'Claude Opus 4.1 ⭐', type: 'text' },
-  { value: 'provider-3/gpt-5-chat', label: 'GPT-5 Chat', type: 'text' },
-  { value: 'provider-5/o3', label: 'O3 🚀', type: 'text' },
-  { value: 'provider-5/grok-4', label: 'Grok 4', type: 'text' },
-  { value: 'provider-5/grok-code-fast-1', label: 'Grok Code Fast 💻', type: 'text' },
-  // Reasoning & Research Models
-  { value: 'provider-3/deepseek-v3', label: 'DeepSeek V3 🔍', type: 'text' },
-  { value: 'provider-3/glm-4.5', label: 'GLM 4.5', type: 'text' },
-  { value: 'provider-5/sonar', label: 'Sonar', type: 'text' },
-  { value: 'provider-5/sonar-reasoning', label: 'Sonar Reasoning 🧠', type: 'text' },
-  { value: 'provider-5/sonar-reasoning-pro', label: 'Sonar Reasoning Pro 🧠⭐', type: 'text' },
-  { value: 'provider-5/sonar-pro', label: 'Sonar Pro ⭐', type: 'text' },
-  { value: 'provider-5/sonar-pro-search', label: 'Sonar Pro Search 🔎', type: 'text' },
-  { value: 'provider-5/sonar-deep-research', label: 'Sonar Deep Research 📚', type: 'text' },
-  // Search Models
-  { value: 'provider-5/gpt-4o-search-preview-v2', label: 'GPT-4o Search Preview 🔎', type: 'text' },
+const AVAILABLE_MODELS: ComboboxOption[] = [
+  // Text Generation Models - Claude
+  { value: 'provider-7/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 ⚡', category: 'Claude Models' },
+  { value: 'provider-7/claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', category: 'Claude Models' },
+  { value: 'provider-5/claude-3.7-sonnet-thinking', label: 'Claude 3.7 Sonnet 🧠', category: 'Claude Models' },
+  { value: 'provider-5/claude-opus-4.1', label: 'Claude Opus 4.1 ⭐', category: 'Claude Models' },
+  
+  // Text Generation Models - GPT
+  { value: 'provider-3/gpt-5-chat', label: 'GPT-5 Chat', category: 'GPT Models' },
+  { value: 'provider-5/o3', label: 'O3 🚀', category: 'GPT Models' },
+  { value: 'provider-1/chatgpt-4o-latest', label: 'ChatGPT 4o Latest', category: 'GPT Models' },
+  
+  // Text Generation Models - Other
+  { value: 'provider-5/grok-4', label: 'Grok 4', category: 'Other Text Models' },
+  { value: 'provider-5/grok-code-fast-1', label: 'Grok Code Fast 💻', category: 'Other Text Models' },
+  { value: 'provider-3/deepseek-v3', label: 'DeepSeek V3 🔍', category: 'Other Text Models' },
+  { value: 'provider-3/glm-4.5', label: 'GLM 4.5', category: 'Other Text Models' },
+  
+  // Research & Reasoning Models
+  { value: 'provider-5/sonar', label: 'Sonar', category: 'Research & Reasoning' },
+  { value: 'provider-5/sonar-reasoning', label: 'Sonar Reasoning 🧠', category: 'Research & Reasoning' },
+  { value: 'provider-5/sonar-reasoning-pro', label: 'Sonar Reasoning Pro 🧠⭐', category: 'Research & Reasoning' },
+  { value: 'provider-5/sonar-pro', label: 'Sonar Pro ⭐', category: 'Research & Reasoning' },
+  { value: 'provider-5/sonar-pro-search', label: 'Sonar Pro Search 🔎', category: 'Research & Reasoning' },
+  { value: 'provider-5/sonar-deep-research', label: 'Sonar Deep Research 📚', category: 'Research & Reasoning' },
+  { value: 'provider-5/gpt-4o-search-preview-v2', label: 'GPT-4o Search Preview 🔎', category: 'Research & Reasoning' },
+  
   // Coding Models
-  { value: 'provider-3/qwen-3-coder-plus', label: 'Qwen 3 Coder Plus 💻⭐', type: 'text' },
+  { value: 'provider-3/qwen-3-coder-plus', label: 'Qwen 3 Coder Plus 💻⭐', category: 'Coding Models' },
+  
+  // Image Generation Models (NEW!)
+  { value: 'provider-3/dall-e-3', label: 'DALL-E 3 🎨', category: 'Image Generation' },
+  { value: 'provider-5/dall-e-3', label: 'DALL-E 3 (Alt) 🎨', category: 'Image Generation' },
+  { value: 'provider-4/flux-schnell', label: 'Flux Schnell ⚡🎨', category: 'Image Generation' },
+  { value: 'provider-4/flux-1.1-pro', label: 'Flux 1.1 Pro 🎨⭐', category: 'Image Generation' },
+  { value: 'provider-2/stable-diffusion-xl', label: 'Stable Diffusion XL 🎨', category: 'Image Generation' },
+  { value: 'provider-2/stable-diffusion-3', label: 'Stable Diffusion 3 🎨', category: 'Image Generation' },
+  { value: 'provider-1/imagen-3', label: 'Imagen 3 🎨', category: 'Image Generation' },
 ];
 
 export default function Sidebar({
@@ -61,10 +70,30 @@ export default function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previousModel, setPreviousModel] = useState(selectedModel);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle model change - create new chat session automatically
+  const handleModelChange = useCallback((newModel: string) => {
+    // Only create new chat if we're switching from a different model
+    // and there are existing messages in the current conversation
+    if (newModel !== previousModel) {
+      const currentConversation = conversations.find(c => c.id === currentConversationId);
+      const hasMessages = currentConversation && currentConversation.messages && currentConversation.messages.length > 0;
+      
+      // If current conversation has messages, create a new chat
+      // This prevents mixing responses from different models
+      if (hasMessages) {
+        onNewChat(); // Create new chat session
+      }
+      
+      setPreviousModel(newModel);
+      onModelChange(newModel); // Update the model
+    }
+  }, [previousModel, conversations, currentConversationId, onNewChat, onModelChange]);
 
   if (isCollapsed) {
     return (
@@ -122,19 +151,27 @@ export default function Sidebar({
           <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
             <Settings className="h-3 w-3" />
             Model Selection
+            {selectedModel && (
+              selectedModel.includes('dall-e') ||
+              selectedModel.includes('flux') ||
+              selectedModel.includes('stable-diffusion') ||
+              selectedModel.includes('imagen')
+            ) && (
+              <span className="flex items-center gap-1 text-xs bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
+                <Image className="h-3 w-3" />
+                Image
+              </span>
+            )}
           </label>
-          <Select value={selectedModel} onValueChange={onModelChange}>
-            <SelectTrigger className="w-full text-xs sm:text-sm border-0 bg-background">
-              <SelectValue placeholder="Select a model" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {AVAILABLE_MODELS.map((model) => (
-                <SelectItem key={model.value} value={model.value} className="text-xs sm:text-sm">
-                  {model.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            options={AVAILABLE_MODELS}
+            value={selectedModel}
+            onValueChange={handleModelChange}
+            placeholder="Search and select a model..."
+            searchPlaceholder="Search models..."
+            emptyText="No model found."
+            className="w-full text-xs sm:text-sm"
+          />
         </div>
       </div>
 
