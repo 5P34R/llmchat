@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ThemeToggle } from './theme-toggle';
-import { MessageSquare, Plus, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageSquare, Plus, Settings, ChevronLeft, ChevronRight, Hash, Trash2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -12,18 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-interface Conversation {
-  id: string;
-  title: string;
-  timestamp: number;
-}
+import { ChatSession } from '@/types/chat';
 
 interface SidebarProps {
-  conversations: Conversation[];
+  conversations: ChatSession[];
   currentConversationId: string | null;
   onNewChat: () => void;
   onSelectConversation: (id: string) => void;
+  onDeleteConversation?: (id: string) => void;
   selectedModel: string;
   onModelChange: (model: string) => void;
 }
@@ -58,11 +54,13 @@ export default function Sidebar({
   currentConversationId,
   onNewChat,
   onSelectConversation,
+  onDeleteConversation,
   selectedModel,
   onModelChange,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -94,25 +92,25 @@ export default function Sidebar({
   }
 
   return (
-    <div className="w-64 border-r border-border/40 bg-muted/30 flex flex-col">
-      <div className="p-4 border-b border-border/40 flex items-center justify-between">
-        <h2 className="font-semibold tracking-tight">LLM Chat</h2>
+    <div className="w-64 lg:w-72 border-r border-border/40 bg-muted/30 flex flex-col h-full">
+      <div className="p-3 sm:p-4 border-b border-border/40 flex items-center justify-between">
+        <h2 className="font-semibold tracking-tight text-sm sm:text-base">LLM Chat</h2>
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsCollapsed(true)}
-            className="h-9 w-9"
+            className="h-8 w-8 sm:h-9 sm:w-9 hidden lg:flex"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <Button onClick={onNewChat} className="w-full justify-start" size="sm">
-          <Plus className="h-4 w-4 mr-2" />
+      <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+        <Button onClick={onNewChat} className="w-full justify-start text-xs sm:text-sm" size="sm">
+          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
           New Chat
         </Button>
 
@@ -122,12 +120,12 @@ export default function Sidebar({
             Model Selection
           </label>
           <Select value={selectedModel} onValueChange={onModelChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full text-xs sm:text-sm">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[300px]">
               {AVAILABLE_MODELS.map((model) => (
-                <SelectItem key={model.value} value={model.value}>
+                <SelectItem key={model.value} value={model.value} className="text-xs sm:text-sm">
                   {model.label}
                 </SelectItem>
               ))}
@@ -136,33 +134,102 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground mb-2">
             Recent Conversations
           </h3>
           {conversations.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No conversations yet</p>
+            <p className="text-xs text-muted-foreground px-2">No conversations yet</p>
           ) : (
             conversations.map((conv) => (
               <Card
                 key={conv.id}
-                className={`p-3 cursor-pointer hover:bg-accent transition-colors ${
+                className={`group relative p-2 sm:p-3 cursor-pointer hover:bg-accent transition-colors ${
                   currentConversationId === conv.id ? 'bg-accent' : ''
                 }`}
-                onClick={() => onSelectConversation(conv.id)}
               >
-                <div className="flex items-start gap-2">
-                  <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{conv.title}</p>
-                    {mounted && (
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(conv.timestamp).toLocaleDateString()}
-                      </p>
-                    )}
+                {deleteConfirmId === conv.id ? (
+                  // Delete confirmation view
+                  <div className="flex flex-col gap-2 p-1">
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                      Delete this conversation?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1 h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onDeleteConversation) {
+                            onDeleteConversation(conv.id);
+                          }
+                          setDeleteConfirmId(null);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmId(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Normal conversation view
+                  <div
+                    className="flex items-start gap-2"
+                    onClick={() => onSelectConversation(conv.id)}
+                  >
+                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="text-xs sm:text-sm font-medium truncate flex-1">
+                          {conv.title}
+                        </p>
+                        {onDeleteConversation && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmId(conv.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          <Hash className="h-2 w-2 text-muted-foreground" />
+                          <code className="text-[10px] font-mono text-muted-foreground">
+                            {conv.shortId}
+                          </code>
+                        </div>
+                        {mounted && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(conv.timestamp).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {conv.metadata && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {conv.metadata.messageCount} messages
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </Card>
             ))
           )}

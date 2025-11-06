@@ -14,6 +14,7 @@ interface ChatInterfaceProps {
   onMessagesUpdate?: (messages: Message[]) => void;
   selectedModel?: string;
   onPreviewUpdate?: (content: { html?: string; css?: string; js?: string }) => void;
+  sessionId?: string | null;
 }
 
 interface ErrorState {
@@ -26,7 +27,8 @@ export default function ChatInterface({
   initialMessages = [],
   onMessagesUpdate,
   selectedModel = 'provider-1/chatgpt-4o-latest',
-  onPreviewUpdate
+  onPreviewUpdate,
+  sessionId
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -131,6 +133,7 @@ export default function ChatInterface({
       role: 'user',
       content: content,
       timestamp: Date.now(),
+      sessionId: sessionId || undefined,
     };
 
     try {
@@ -218,6 +221,7 @@ export default function ChatInterface({
           content: data.revised_prompt || 'Image generated successfully',
           imageUrl: data.url,
           timestamp: Date.now(),
+          sessionId: sessionId || undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -245,6 +249,7 @@ export default function ChatInterface({
           body: JSON.stringify({
             messages: apiMessages,
             model: selectedModel,
+            sessionId: sessionId || undefined,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -265,6 +270,7 @@ export default function ChatInterface({
           role: 'assistant',
           content: data.message,
           timestamp: Date.now(),
+          sessionId: sessionId || undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -308,6 +314,7 @@ export default function ChatInterface({
         role: 'assistant',
         content: `❌ Error: ${error.message || 'Failed to get response. Please try again.'}`,
         timestamp: Date.now(),
+        sessionId: sessionId || undefined,
       };
       
       setMessages((prev) => [...prev, errorMessage]);
@@ -406,9 +413,14 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
-      <div className="flex items-center justify-between p-3 border-b border-border/40 bg-muted/30 shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border-b border-border/40 bg-muted/30 shrink-0 gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-sm font-semibold tracking-tight">Chat</h2>
+          {sessionId && (
+            <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded hidden sm:inline">
+              {sessionId.substring(0, 8)}...
+            </code>
+          )}
           {retryCount > 0 && (
             <span className="text-xs text-yellow-500">
               Retry {retryCount}/{MAX_RETRIES}

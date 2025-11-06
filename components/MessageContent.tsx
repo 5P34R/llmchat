@@ -471,6 +471,93 @@ function CodeConsole({ result, language }: { result: ExecutionResult; language: 
   );
 }
 
+// Language alias mapping for better syntax highlighting support
+function getLanguageAlias(language: string): string {
+  const aliases: Record<string, string> = {
+    'js': 'javascript',
+    'ts': 'typescript',
+    'py': 'python',
+    'rb': 'ruby',
+    'yml': 'yaml',
+    'sh': 'bash',
+    'ps1': 'powershell',
+    'ps': 'powershell',
+    'psm1': 'powershell',
+    'psd1': 'powershell',
+    'bat': 'batch',
+    'cmd': 'batch',
+    'dockerfile': 'docker',
+    'md': 'markdown',
+    'vue': 'javascript',
+    'jsx': 'javascript',
+    'tsx': 'typescript',
+    'c++': 'cpp',
+    'c#': 'csharp',
+    'f#': 'fsharp',
+    'objective-c': 'objectivec',
+    'obj-c': 'objectivec',
+    'shell': 'bash',
+    'zsh': 'bash',
+    'ksh': 'bash',
+    'csh': 'bash',
+    'fish': 'bash',
+    'make': 'makefile',
+    'mk': 'makefile',
+    'rs': 'rust',
+    'go': 'go',
+    'kt': 'kotlin',
+    'kts': 'kotlin',
+    'swift': 'swift',
+    'r': 'r',
+    'R': 'r',
+    'pl': 'perl',
+    'pm': 'perl',
+    'lua': 'lua',
+    'dart': 'dart',
+    'ex': 'elixir',
+    'exs': 'elixir',
+    'erl': 'erlang',
+    'hrl': 'erlang',
+    'hs': 'haskell',
+    'lhs': 'haskell',
+    'ml': 'ocaml',
+    'mli': 'ocaml',
+    'fs': 'fsharp',
+    'fsi': 'fsharp',
+    'fsx': 'fsharp',
+    'clj': 'clojure',
+    'cljs': 'clojure',
+    'cljc': 'clojure',
+    'edn': 'clojure',
+    'scala': 'scala',
+    'sc': 'scala',
+    'php': 'php',
+    'asp': 'aspnet',
+    'aspx': 'aspnet',
+    'jsp': 'java',
+    'jl': 'julia',
+    'nim': 'nim',
+    'nims': 'nim',
+    'nimble': 'nim',
+    'cr': 'crystal',
+    'pas': 'pascal',
+    'pp': 'pascal',
+    'proto': 'protobuf',
+    'graphql': 'graphql',
+    'gql': 'graphql',
+    'sol': 'solidity',
+    'vy': 'python', // Vyper uses Python-like syntax
+    'tf': 'hcl', // Terraform
+    'tfvars': 'hcl',
+    'prisma': 'graphql', // Prisma schema has GraphQL-like syntax
+    'svelte': 'javascript',
+    'astro': 'javascript',
+    'mdx': 'markdown',
+  };
+  
+  return aliases[language.toLowerCase()] || language.toLowerCase();
+}
+
 export default function MessageContent({ content, role, imageUrl, onPreviewUpdate }: MessageContentProps) {
   const { theme } = useTheme();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -543,13 +630,13 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
 
   if (role === 'user') {
     return (
-      <div className="whitespace-pre-wrap">
+      <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
         {imageUrl && (
           <div className="mb-2">
             <Card className="p-2 inline-block">
-              <img 
-                src={imageUrl} 
-                alt="Generated" 
+              <img
+                src={imageUrl}
+                alt="Generated"
                 className="max-w-full h-auto rounded"
                 style={{ maxHeight: '300px' }}
               />
@@ -572,7 +659,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
         </Card>
       }
     >
-      <div className="prose prose-sm max-w-none dark:prose-invert prose-neutral">
+      <div className="prose prose-sm max-w-none dark:prose-invert prose-neutral overflow-x-hidden">
         {imageUrl && (
           <div className="mb-4 not-prose">
             <Card className="p-4">
@@ -611,8 +698,8 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                 const isExecuting = executingCode === codeId;
 
                 return (
-                  <div className="relative group not-prose my-4">
-                    <div className="flex items-center justify-between bg-muted px-4 py-2 rounded-t-lg border border-border">
+                  <div className="relative group not-prose my-4 max-w-full overflow-hidden">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted px-3 sm:px-4 py-2 rounded-t-lg border border-border gap-2">
                       <span className="text-xs font-medium text-muted-foreground uppercase">
                         {language}
                         {isBeautified && (
@@ -621,7 +708,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                           </span>
                         )}
                       </span>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -632,7 +719,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                               beautifyCode(code, language, codeId);
                             }
                           }}
-                          className="h-7 px-2"
+                          className="h-6 sm:h-7 px-1 sm:px-2 text-xs"
                           title={isBeautified ? "Show original" : "Beautify code"}
                         >
                           {isBeautified ? (
@@ -653,7 +740,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                             size="sm"
                             onClick={() => executeCode(displayCode, language, codeId)}
                             disabled={isExecuting}
-                            className="h-7 px-2"
+                            className="h-6 sm:h-7 px-1 sm:px-2 text-xs"
                           >
                             {isExecuting ? (
                               <>
@@ -683,7 +770,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                                 }
                               }
                             }}
-                            className="h-7 px-2"
+                            className="h-6 sm:h-7 px-1 sm:px-2 text-xs"
                           >
                             <Eye className="h-3 w-3 mr-1" />
                             Preview
@@ -693,7 +780,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                           variant="ghost"
                           size="sm"
                           onClick={() => copyToClipboard(displayCode, codeId)}
-                          className="h-7 px-2"
+                          className="h-6 sm:h-7 px-1 sm:px-2 text-xs"
                         >
                           {copiedCode === codeId ? (
                             <>
@@ -709,26 +796,32 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                         </Button>
                       </div>
                     </div>
-                    <Suspense fallback={<div className="p-4">Loading...</div>}>
-                      <SyntaxHighlighter
-                        style={(theme === 'dark' ? vscDarkPlus : vs) as any}
-                        language={language}
-                        PreTag="div"
-                        className="!mt-0 !rounded-t-none"
-                        showLineNumbers={true}
-                        wrapLines={true}
-                        lineProps={{
-                          style: { wordBreak: 'break-all', whiteSpace: 'pre-wrap' }
-                        }}
-                        customStyle={{
-                          margin: 0,
-                          borderTopLeftRadius: 0,
-                          borderTopRightRadius: 0,
-                        }}
-                      >
-                        {displayCode}
-                      </SyntaxHighlighter>
-                    </Suspense>
+                    <div className="overflow-x-auto">
+                      <Suspense fallback={<div className="p-4">Loading...</div>}>
+                        <SyntaxHighlighter
+                          style={(theme === 'dark' ? vscDarkPlus : vs) as any}
+                          language={getLanguageAlias(language)}
+                          PreTag="div"
+                          className="!mt-0 !rounded-t-none"
+                          showLineNumbers={true}
+                          wrapLines={false}
+                          wrapLongLines={true}
+                          lineNumberStyle={{ minWidth: '2.5em' }}
+                          customStyle={{
+                            margin: 0,
+                            borderTopLeftRadius: 0,
+                            borderTopRightRadius: 0,
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            padding: '1rem',
+                            overflowX: 'auto',
+                            maxWidth: '100%',
+                          }}
+                        >
+                          {displayCode}
+                        </SyntaxHighlighter>
+                      </Suspense>
+                    </div>
                     
                     {executionResult && (
                       <CodeConsole result={executionResult} language={language} />

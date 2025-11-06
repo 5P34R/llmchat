@@ -1,11 +1,4 @@
-import { Message } from '@/types/chat';
-
-interface Conversation {
-  id: string;
-  title: string;
-  timestamp: number;
-  messages: Message[];
-}
+import { Message, ChatSession } from '@/types/chat';
 
 interface StoredConversation {
   id: string;
@@ -33,14 +26,14 @@ function compressMessage(message: Message): Message {
 }
 
 // Get all conversations from localStorage
-export function getStoredConversations(): Conversation[] {
+export function getStoredConversations(): ChatSession[] {
   if (typeof window === 'undefined') return [];
   
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
     
-    const conversations: Conversation[] = JSON.parse(stored);
+    const conversations: ChatSession[] = JSON.parse(stored);
     return conversations;
   } catch (error) {
     console.error('Error loading conversations:', error);
@@ -49,7 +42,7 @@ export function getStoredConversations(): Conversation[] {
 }
 
 // Save conversations to localStorage with size optimization
-export function saveConversations(conversations: Conversation[]): void {
+export function saveConversations(conversations: ChatSession[]): void {
   if (typeof window === 'undefined') return;
   
   try {
@@ -143,11 +136,23 @@ export function exportConversations(): string {
 // Import conversations from JSON
 export function importConversations(jsonData: string): boolean {
   try {
-    const conversations: Conversation[] = JSON.parse(jsonData);
+    const conversations: ChatSession[] = JSON.parse(jsonData);
     saveConversations(conversations);
     return true;
   } catch (error) {
     console.error('Error importing conversations:', error);
     return false;
   }
+}
+
+// Get conversation by session ID
+export function getConversationById(sessionId: string): ChatSession | null {
+  const conversations = getStoredConversations();
+  return conversations.find(conv => conv.id === sessionId) || null;
+}
+
+// Get all messages for a session
+export function getSessionMessages(sessionId: string): Message[] {
+  const conversation = getConversationById(sessionId);
+  return conversation?.messages || [];
 }

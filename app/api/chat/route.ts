@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { a4fClient, DEFAULT_MODEL } from '@/lib/openai';
 import { ChatCompletionRequest } from '@/types/chat';
+import { getSessionMessages } from '@/lib/storage';
 
 // Retry configuration for stability
 const MAX_RETRIES = 3;
@@ -60,10 +61,37 @@ export async function POST(request: NextRequest) {
 
     const modelToUse = body.model || DEFAULT_MODEL;
     const useThoughtChain = body.useThoughtChain !== false; // Default to true for all models
+    const sessionId = body.sessionId;
     
-    console.log('Using model:', modelToUse, useThoughtChain ? '(with chain of thought)' : '');
+    console.log('Using model:', modelToUse, useThoughtChain ? '(with chain of thought)' : '', sessionId ? `Session: ${sessionId}` : '');
 
     let messages = body.messages;
+
+    // If session ID is provided, include previous context (last 10 messages for context window)
+    if (sessionId && typeof window !== 'undefined') {
+      try {
+        const sessionMessages = getSessionMessages(sessionId);
+        if (sessionMessages.length > 0) {
+          // Get last 10 messages for context, but always include the current message
+          const contextMessages = sessionMessages
+            .slice(-10)
+            .filter(msg => !messages.some(m => m.content === msg.content))
+            .map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }));
+          
+          // Prepend context messages if they exist
+          if (contextMessages.length > 0) {
+            console.log(`Including ${contextMessages.length} context messages from session ${sessionId}`);
+            messages = [...contextMessages, ...messages];
+          }
+        }
+      } catch (error) {
+        console.error('Error loading session context:', error);
+        // Continue without session context if there's an error
+      }
+    }
 
     // Apply chain of thought prompting for all models (can be toggled)
     if (useThoughtChain && messages.length > 0) {
@@ -106,6 +134,7 @@ Use clear, structured thinking to provide accurate and well-reasoned responses.`
       usage: completion.usage,
       model: modelToUse,
       thoughtChain: useThoughtChain,
+      sessionId: sessionId,
     });
   } catch (error: any) {
     console.error('Chat API Error:', error);

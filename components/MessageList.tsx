@@ -27,17 +27,23 @@ export default function MessageList({ messages, onPreviewUpdate }: MessageListPr
           }`}
         >
           <Card
-            className={`max-w-[80%] p-4 ${
-              message.role === 'user'
-                ? 'bg-primary text-primary-foreground border-primary/20'
-                : 'bg-muted border-border/40'
-            }`}
+            className={`
+              w-full sm:max-w-[85%] md:max-w-[80%] lg:max-w-[75%]
+              p-3 sm:p-4
+              ${
+                message.role === 'user'
+                  ? 'bg-primary text-primary-foreground border-primary/20 ml-4 sm:ml-8'
+                  : 'bg-muted border-border/40 mr-4 sm:mr-8'
+              }
+            `}
           >
             {message.fileData && (
               <div className="mb-2 pb-2 border-b border-border/40">
-                <div className="flex items-center gap-2 text-sm opacity-90">
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm opacity-90">
                   <span>📎</span>
-                  <span className="font-medium">{message.fileData.name}</span>
+                  <span className="font-medium truncate max-w-[200px]">
+                    {message.fileData.name}
+                  </span>
                   <span className="text-xs opacity-70">
                     ({(message.fileData.size / 1024).toFixed(2)} KB)
                   </span>
@@ -50,11 +56,18 @@ export default function MessageList({ messages, onPreviewUpdate }: MessageListPr
               imageUrl={message.imageUrl}
               onPreviewUpdate={onPreviewUpdate}
             />
-            {mounted && (
-              <div className="text-xs opacity-60 mt-2">
-                {new Date(message.timestamp).toLocaleTimeString()}
-              </div>
-            )}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/20">
+              {mounted && (
+                <div className="text-xs opacity-60">
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </div>
+              )}
+              {message.sessionId && (
+                <code className="text-xs opacity-40 font-mono">
+                  #{message.sessionId.substring(0, 6)}
+                </code>
+              )}
+            </div>
           </Card>
         </div>
       ))}

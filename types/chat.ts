@@ -5,6 +5,7 @@ export interface Message {
   timestamp: number;
   fileData?: FileData;
   imageUrl?: string;
+  sessionId?: string; // Add session tracking
 }
 
 export interface FileData {
@@ -12,6 +13,19 @@ export interface FileData {
   type: string;
   size: number;
   content: string;
+}
+
+export interface ChatSession {
+  id: string;
+  shortId: string;
+  title: string;
+  timestamp: number;
+  messages: Message[];
+  metadata?: {
+    createdAt: number;
+    lastActiveAt: number;
+    messageCount: number;
+  };
 }
 
 export interface ChatCompletionRequest {
@@ -23,4 +37,5 @@ export interface ChatCompletionRequest {
   temperature?: number;
   max_tokens?: number;
   useThoughtChain?: boolean;
+  sessionId?: string; // Add session context
 }
