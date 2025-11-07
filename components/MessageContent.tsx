@@ -970,7 +970,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                         </Button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto w-full">
+                    <div className="overflow-x-auto w-full code-block-container">
                       <Suspense fallback={<div className="p-4">Loading...</div>}>
                         <SyntaxHighlighter
                           style={(theme === 'dark' ? vscDarkPlus : vs) as any}
@@ -981,28 +981,21 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                           wrapLines={false}
                           wrapLongLines={false}
                           lineNumberStyle={{
-                            minWidth: '2em',
-                            paddingRight: '0.5em',
-                            userSelect: 'none',
-                            fontSize: '0.75rem'
+                            minWidth: '2.5em',
+                            paddingRight: '0.75em',
+                            userSelect: 'none'
                           }}
                           customStyle={{
                             margin: 0,
                             borderTopLeftRadius: 0,
                             borderTopRightRadius: 0,
-                            fontSize: '0.75rem',
+                            fontSize: '0.875rem',
                             lineHeight: '1.5',
-                            padding: '0.75rem',
+                            padding: '1rem',
                             overflowX: 'auto',
                             width: '100%',
                             minHeight: '3rem',
-                            maxHeight: '400px',
-                            // Mobile-specific styles
-                            '@media (min-width: 640px)': {
-                              fontSize: '0.875rem',
-                              padding: '1rem',
-                              maxHeight: '800px'
-                            }
+                            maxHeight: '600px'
                           }}
                           codeTagProps={{
                             style: {
