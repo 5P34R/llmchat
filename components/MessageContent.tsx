@@ -697,23 +697,31 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
         </Card>
       }
     >
-      {/* Enhanced prose styling for better markdown rendering */}
+      {/* Enhanced prose styling with mobile optimization */}
       <div className="prose prose-sm max-w-none dark:prose-invert
                       prose-headings:font-bold prose-headings:tracking-tight
-                      prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base
+                      prose-h1:text-xl sm:prose-h1:text-2xl
+                      prose-h2:text-lg sm:prose-h2:text-xl
+                      prose-h3:text-base sm:prose-h3:text-lg
+                      prose-h4:text-sm sm:prose-h4:text-base
                       prose-p:leading-relaxed prose-p:text-gray-700 dark:prose-p:text-gray-300
+                      prose-p:text-sm sm:prose-p:text-base
                       prose-li:text-gray-700 dark:prose-li:text-gray-300
+                      prose-li:text-sm sm:prose-li:text-base
                       prose-strong:text-gray-900 dark:prose-strong:text-gray-100
                       prose-code:text-pink-600 dark:prose-code:text-pink-400
                       prose-code:bg-gray-100 dark:prose-code:bg-gray-800
                       prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                      prose-code:text-xs sm:prose-code:text-sm
                       prose-pre:bg-gray-900 dark:prose-pre:bg-gray-950
                       prose-blockquote:border-l-gray-300 dark:prose-blockquote:border-l-gray-600
                       prose-blockquote:text-gray-700 dark:prose-blockquote:text-gray-300
                       prose-table:overflow-hidden
                       prose-th:bg-gray-100 dark:prose-th:bg-gray-800
-                      prose-td:p-2 prose-th:p-2
-                      overflow-x-auto">
+                      prose-td:p-1 sm:prose-td:p-2 prose-th:p-1 sm:prose-th:p-2
+                      prose-td:text-xs sm:prose-td:text-sm
+                      prose-th:text-xs sm:prose-th:text-sm
+                      overflow-x-auto w-full">
         {imageUrl && (
           <div className="mb-4 not-prose">
             <Card className="p-4">
@@ -864,17 +872,17 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                 const isExecuting = executingCode === codeId;
 
                 return (
-                  <div className="relative group not-prose my-4 max-w-full overflow-hidden">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted px-3 sm:px-4 py-2 rounded-t-lg border border-border gap-2">
-                      <span className="text-xs font-medium text-muted-foreground uppercase">
+                  <div className="relative group not-prose my-4 w-full overflow-hidden">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted px-2 sm:px-4 py-2 rounded-t-lg border border-border gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase truncate max-w-[150px] sm:max-w-none">
                         {language}
                         {isBeautified && (
-                          <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                          <span className="ml-1 sm:ml-2 text-xs text-green-600 dark:text-green-400">
                             (beautified)
                           </span>
                         )}
                       </span>
-                      <div className="flex gap-1 flex-wrap">
+                      <div className="flex gap-1 flex-wrap justify-end w-full sm:w-auto">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -885,7 +893,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                               beautifyCode(code, language, codeId);
                             }
                           }}
-                          className="h-6 sm:h-7 px-1 sm:px-2 text-xs"
+                          className="h-6 sm:h-7 px-1.5 sm:px-2 text-xs"
                           title={isBeautified ? "Show original" : "Beautify code"}
                         >
                           {isBeautified ? (
@@ -962,7 +970,7 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                         </Button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto w-full">
                       <Suspense fallback={<div className="p-4">Loading...</div>}>
                         <SyntaxHighlighter
                           style={(theme === 'dark' ? vscDarkPlus : vs) as any}
@@ -971,23 +979,30 @@ export default function MessageContent({ content, role, imageUrl, onPreviewUpdat
                           className="!mt-0 !rounded-t-none"
                           showLineNumbers={true}
                           wrapLines={false}
-                          wrapLongLines={true}
+                          wrapLongLines={false}
                           lineNumberStyle={{
-                            minWidth: '2.5em',
-                            paddingRight: '1em',
-                            userSelect: 'none'
+                            minWidth: '2em',
+                            paddingRight: '0.5em',
+                            userSelect: 'none',
+                            fontSize: '0.75rem'
                           }}
                           customStyle={{
                             margin: 0,
                             borderTopLeftRadius: 0,
                             borderTopRightRadius: 0,
-                            fontSize: '0.875rem',
+                            fontSize: '0.75rem',
                             lineHeight: '1.5',
-                            padding: '1rem',
+                            padding: '0.75rem',
                             overflowX: 'auto',
-                            maxWidth: '100%',
+                            width: '100%',
                             minHeight: '3rem',
-                            maxHeight: '800px', // Increased for longer code blocks
+                            maxHeight: '400px',
+                            // Mobile-specific styles
+                            '@media (min-width: 640px)': {
+                              fontSize: '0.875rem',
+                              padding: '1rem',
+                              maxHeight: '800px'
+                            }
                           }}
                           codeTagProps={{
                             style: {
