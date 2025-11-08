@@ -48,19 +48,31 @@ export function getStoredConversations(): ChatSession[] {
     // Validate and fix conversation data
     const conversations: ChatSession[] = Array.isArray(parsed) ? parsed : [];
     
-    // Ensure each conversation has required fields
-    return conversations.map(conv => ({
-      id: conv.id || Date.now().toString(),
-      shortId: conv.shortId || 'unknown',
-      title: conv.title || 'Untitled',
-      timestamp: conv.timestamp || Date.now(),
-      messages: Array.isArray(conv.messages) ? conv.messages : [],
-      metadata: conv.metadata || {
-        createdAt: conv.timestamp || Date.now(),
-        lastActiveAt: Date.now(),
-        messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
+    // Filter out invalid conversations and ensure each has required fields
+    const validConversations = conversations
+      .filter(conv => conv && typeof conv === 'object' && conv.id && conv.id.trim() !== '')
+      .map(conv => ({
+        id: conv.id,
+        shortId: conv.shortId || 'unknown',
+        title: conv.title || 'Untitled',
+        timestamp: conv.timestamp || Date.now(),
+        messages: Array.isArray(conv.messages) ? conv.messages : [],
+        metadata: conv.metadata || {
+          createdAt: conv.timestamp || Date.now(),
+          lastActiveAt: Date.now(),
+          messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
+        }
+      }));
+    
+    // Remove duplicates based on ID
+    const uniqueConversations = validConversations.reduce((acc: ChatSession[], conv) => {
+      if (!acc.find(c => c.id === conv.id)) {
+        acc.push(conv);
       }
-    }));
+      return acc;
+    }, []);
+    
+    return uniqueConversations;
   } catch (error) {
     console.error('Error loading conversations:', error);
     // Try to recover by clearing corrupted data
@@ -193,12 +205,7 @@ export function deleteConversation(conversationId: string): void {
     const conversations = getStoredConversations();
     const filtered = conversations.filter(conv => conv && conv.id !== conversationId);
     
-    // Ensure at least one conversation remains
-    if (filtered.length === 0) {
-      console.warn('Cannot delete last conversation');
-      return;
-    }
-    
+    // Don't prevent deletion of last conversation - let the UI handle creating a new one
     saveConversations(filtered);
   } catch (error) {
     console.error('Error deleting conversation:', error);

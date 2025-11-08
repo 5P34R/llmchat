@@ -41,60 +41,72 @@ export default function Home() {
     try {
       const stored = getStoredConversations();
       if (stored && stored.length > 0) {
-        // Convert old format to new format if needed
-        const convertedConversations = stored.map((conv: any) => {
-          if (!conv || typeof conv !== 'object') {
-            const metadata = createSessionMetadata();
-            return {
-              id: metadata.id,
-              shortId: metadata.shortId,
-              title: 'Recovered Conversation',
-              timestamp: Date.now(),
-              messages: [],
-              metadata: {
-                createdAt: Date.now(),
-                lastActiveAt: Date.now(),
-                messageCount: 0
-              }
-            } as ChatSession;
-          }
+        // Filter out any invalid or empty conversations
+        const validConversations = stored.filter(conv =>
+          conv &&
+          typeof conv === 'object' &&
+          conv.id &&
+          conv.id.trim() !== ''
+        );
+
+        if (validConversations.length > 0) {
+          // Convert old format to new format if needed
+          const convertedConversations = validConversations.map((conv: any) => {
+            if (!('shortId' in conv)) {
+              const metadata = createSessionMetadata();
+              return {
+                id: conv.id,
+                shortId: metadata.shortId,
+                title: conv.title || 'New Conversation',
+                timestamp: conv.timestamp || Date.now(),
+                messages: Array.isArray(conv.messages) ? conv.messages : [],
+                metadata: {
+                  createdAt: conv.timestamp || Date.now(),
+                  lastActiveAt: conv.timestamp || Date.now(),
+                  messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
+                }
+              } as ChatSession;
+            }
+            return conv as ChatSession;
+          });
           
-          if (!('shortId' in conv)) {
-            const metadata = createSessionMetadata();
-            return {
-              id: conv.id || metadata.id,
-              shortId: metadata.shortId,
-              title: conv.title || 'New Conversation',
-              timestamp: conv.timestamp || Date.now(),
-              messages: Array.isArray(conv.messages) ? conv.messages : [],
-              metadata: {
-                createdAt: conv.timestamp || Date.now(),
-                lastActiveAt: conv.timestamp || Date.now(),
-                messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0
-              }
-            } as ChatSession;
-          }
-          return conv as ChatSession;
-        });
-        setConversations(convertedConversations);
-        setCurrentConversationId(convertedConversations[0].id);
-      } else {
-      // Create initial conversation if none exists
-      const sessionMeta = createSessionMetadata();
-      const initialConversation: ChatSession = {
-        id: sessionMeta.id,
-        shortId: sessionMeta.shortId,
-        title: 'New Conversation',
-        timestamp: Date.now(),
-        messages: [],
-        metadata: {
-          createdAt: sessionMeta.createdAt,
-          lastActiveAt: sessionMeta.lastActiveAt,
-          messageCount: 0
+          setConversations(convertedConversations);
+          setCurrentConversationId(convertedConversations[0].id);
+        } else {
+          // Create initial conversation if no valid conversations exist
+          const sessionMeta = createSessionMetadata();
+          const initialConversation: ChatSession = {
+            id: sessionMeta.id,
+            shortId: sessionMeta.shortId,
+            title: 'New Conversation',
+            timestamp: Date.now(),
+            messages: [],
+            metadata: {
+              createdAt: sessionMeta.createdAt,
+              lastActiveAt: sessionMeta.lastActiveAt,
+              messageCount: 0
+            }
+          };
+          setConversations([initialConversation]);
+          setCurrentConversationId(initialConversation.id);
         }
-      };
-      setConversations([initialConversation]);
-      setCurrentConversationId(initialConversation.id);
+      } else {
+        // Create initial conversation if none exists
+        const sessionMeta = createSessionMetadata();
+        const initialConversation: ChatSession = {
+          id: sessionMeta.id,
+          shortId: sessionMeta.shortId,
+          title: 'New Conversation',
+          timestamp: Date.now(),
+          messages: [],
+          metadata: {
+            createdAt: sessionMeta.createdAt,
+            lastActiveAt: sessionMeta.lastActiveAt,
+            messageCount: 0
+          }
+        };
+        setConversations([initialConversation]);
+        setCurrentConversationId(initialConversation.id);
       }
       setIsLoaded(true);
     } catch (error) {
@@ -164,10 +176,38 @@ export default function Home() {
   };
 
   const handleDeleteConversation = (id: string) => {
-    // Don't delete if it's the only conversation
+    // Find the conversation to delete
+    const conversationToDelete = conversations.find(c => c.id === id);
+    if (!conversationToDelete) return;
+
+    // If this is the last conversation, create a new one
     if (conversations.length === 1) {
-      // Create a new conversation instead
-      handleNewChat();
+      // Create a new conversation
+      const sessionMeta = createSessionMetadata();
+      const newConversation: ChatSession = {
+        id: sessionMeta.id,
+        shortId: sessionMeta.shortId,
+        title: 'New Conversation',
+        timestamp: Date.now(),
+        messages: [],
+        metadata: {
+          createdAt: sessionMeta.createdAt,
+          lastActiveAt: sessionMeta.lastActiveAt,
+          messageCount: 0
+        }
+      };
+      
+      // Replace the old conversation with the new one
+      setConversations([newConversation]);
+      setCurrentConversationId(newConversation.id);
+      
+      // Delete from storage
+      deleteConversation(id);
+      
+      // Save the new conversation
+      saveConversations([newConversation]);
+      
+      setIsMobileSidebarOpen(false);
       return;
     }
 
@@ -183,16 +223,17 @@ export default function Home() {
       nextConversationId = conversations[currentIndex + 1].id;
     }
 
-    // Remove from state
-    setConversations(prev => prev.filter(c => c.id !== id));
-    
-    // Delete from storage
-    deleteConversation(id);
+    // Remove from state first
+    const updatedConversations = conversations.filter(c => c.id !== id);
+    setConversations(updatedConversations);
     
     // Update current conversation if needed
     if (currentConversationId === id && nextConversationId) {
       setCurrentConversationId(nextConversationId);
     }
+    
+    // Delete from storage after state update
+    deleteConversation(id);
     
     setIsMobileSidebarOpen(false); // Close sidebar on mobile after deletion
   };
